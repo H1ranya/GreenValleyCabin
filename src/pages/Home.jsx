@@ -22,16 +22,21 @@ import { useState, useRef } from "react";
 import GalleryLightbox from "../components/GalleryLightbox";
 import bookingLogo from "../assets/booking.png";
 import Map from "../components/Map";
+import emailjs from '@emailjs/browser';
 
 
 
 export default function Home() {
     const [lightboxIndex, setLightboxIndex] = useState(null);
+    const [carouselIndex, setCarouselIndex] = useState(0);
 
     const openLightbox = (i) => setLightboxIndex(i);
     const closeLightbox = () => setLightboxIndex(null);
     const prevImage = () => setLightboxIndex((i) => (i - 1 + galleryImages.length) % galleryImages.length);
     const nextImage = () => setLightboxIndex((i) => (i + 1) % galleryImages.length);
+
+    const handleCarouselPrev = () => setCarouselIndex((i) => (i - 1 + galleryImages.length) % galleryImages.length);
+    const handleCarouselNext = () => setCarouselIndex((i) => (i + 1) % galleryImages.length);
 
     const stripRef = useRef(null);
 
@@ -67,24 +72,21 @@ export default function Home() {
         setSubmitStatus("submitting");
 
         try {
-            const response = await fetch("https://formsubmit.co/ajax/hiranyae1@gmail.com", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
+            // Replace 'YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', and 'YOUR_PUBLIC_KEY' with your actual EmailJS credentials
+            const response = await emailjs.send(
+                'YOUR_SERVICE_ID',
+                'YOUR_TEMPLATE_ID',
+                {
+                    first_name: formData.firstName,
+                    last_name: formData.lastName,
+                    user_email: formData.email,
+                    mobile_number: formData.mobileNumber,
+                    message: formData.message,
                 },
-                body: JSON.stringify({
-                    _subject: `New Contact Submission - Green Valley Cabin`,
-                    "First Name": formData.firstName,
-                    "Last Name": formData.lastName,
-                    "Email": formData.email,
-                    "Mobile Number": formData.mobileNumber,
-                    "Message": formData.message
-                })
-            });
+                'YOUR_PUBLIC_KEY'
+            );
 
-            const result = await response.json();
-            if (response.ok && result.success === "true") {
+            if (response.status === 200) {
                 setSubmitStatus("success");
                 setStatusMessage("Thank you! Your message has been sent successfully.");
                 setFormData({
@@ -96,7 +98,7 @@ export default function Home() {
                 });
             } else {
                 setSubmitStatus("error");
-                setStatusMessage(result.message || "Failed to send. Please verify ckhira@gmail.com is activated.");
+                setStatusMessage("Failed to send. Please verify your EmailJS configuration.");
             }
         } catch (error) {
             setSubmitStatus("error");
@@ -128,7 +130,7 @@ export default function Home() {
                 <p className="hero-caption">
                     Peaceful luxury cabin in the heart of Nuwara Eliya, surrounded by tea estates and endless mountain views.
                 </p>
-                <img src={logo} alt="Resort Logo" className="hero-logo" />
+                <img src={logo} alt="Resort Logo" className="hero-logo" fetchpriority="high" />
 
             </section>
 
@@ -139,7 +141,7 @@ export default function Home() {
                     {/* Left: Content Block */}
                     <div className="about-content">
                         <div className="about-header">
-                            <img src={logo} alt="Green Valley Cabin Logo" className="about-logo" />
+                            <img loading="lazy" decoding="async" src={logo} alt="Green Valley Cabin Logo" className="about-logo" />
                             <h2 className="about-title">About Green Valley Cabin Nuwaraeliya</h2>
                         </div>
 
@@ -172,19 +174,56 @@ export default function Home() {
                     <h2 className="section-title">Gallery</h2>
                     <p className="gallery-subtitle">A glimpse into life at the cabin</p>
                 </div>
-                <div
-                    className="gallery-strip"
-                    ref={stripRef}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                >
-                    {galleryImages.map((src, i) => (
-                        <div key={i} className="gallery-strip-item" onClick={() => openLightbox(i)}>
-                            <img src={src} alt={`Gallery image ${i + 1}`} />
-                        </div>
-                    ))}
+                <div className="gallery-carousel-container">
+                    <div className="gallery-carousel-track">
+                        {galleryImages.map((src, i) => {
+                            let offset = i - carouselIndex;
+                            const half = Math.floor(galleryImages.length / 2);
+                            if (offset > half) offset -= galleryImages.length;
+                            if (offset < -half) offset += galleryImages.length;
+                            
+                            const absOffset = Math.abs(offset);
+                            if (absOffset > 2) return null; // Show only 5 images at a time
+                            
+                            const isActive = offset === 0;
+                            
+                            // Adjust these values to match the 3D effect in the screenshot
+                            const scale = isActive ? 1 : 1 - (absOffset * 0.15);
+                            const translateX = offset * 45; // percentage
+                            const zIndex = 100 - absOffset;
+                            const opacity = isActive ? 1 : 1 - (absOffset * 0.3);
+
+                            return (
+                                <div 
+                                    key={i} 
+                                    className={`gallery-carousel-item ${isActive ? 'active' : ''}`}
+                                    onClick={() => isActive ? openLightbox(i) : setCarouselIndex(i)}
+                                    style={{
+                                        transform: `translateX(calc(-50% + ${translateX}%)) scale(${scale})`,
+                                        zIndex: zIndex,
+                                        opacity: opacity
+                                    }}
+                                >
+                                    <img loading="lazy" decoding="async" src={src} alt={`Gallery image ${i + 1}`} />
+                                    {!isActive && (
+                                        <div className="gallery-carousel-overlay"></div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="gallery-carousel-controls">
+                        <button className="carousel-btn" onClick={handleCarouselPrev}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M15 18l-6-6 6-6" />
+                            </svg>
+                        </button>
+                        <button className="carousel-btn" onClick={handleCarouselNext}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M9 18l6-6-6-6" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
                 {lightboxIndex !== null && (
@@ -358,6 +397,8 @@ export default function Home() {
                         </a>
                         <a href="https://www.booking.com/Share-uR98Jg" target="_blank" rel="noopener noreferrer" className="social-link booking-link">
                             <img
+                                loading="lazy"
+                                decoding="async"
                                 src={bookingLogo}
                                 alt="Booking.com"
                                 style={{ height: "28px", width: "auto" }}
